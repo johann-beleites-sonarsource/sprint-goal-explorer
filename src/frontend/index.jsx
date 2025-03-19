@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import ForgeReconciler, {Text, Fragment} from '@forge/react';
+import React, {useEffect, useState, Fragment} from 'react';
+import ForgeReconciler, {Text, Strong, Em} from '@forge/react';
 import {invoke} from '@forge/bridge';
 
 const App = () => {
@@ -19,6 +19,8 @@ const App = () => {
             });
     }, []);
 
+    console.log("Sprints: ", sprints);
+
     return (
         <>
             <Text>Active Sprints:</Text>
@@ -26,11 +28,20 @@ const App = () => {
                 <Text>Loading...</Text>
             ) : sprints.length > 0 ? (
                 <>
-                    {sprints.map((sprint, index) => (
-                        <Text key={index}>
-                            \- {sprint.boardName}: {sprint.sprintName}
-                        </Text>
-                    ))}
+                    {sprints.map((sprint, index) => {
+                        const goalText = sprint.goal || 'No goal set';
+                        const goalLines = goalText.split('\n');
+
+                        return (
+                            <React.Fragment key={index}>
+                                <Strong>{sprint.sprintName}</Strong>
+                                <Text><Em>Goal:</Em></Text>
+                                {goalLines.map((line, lineIndex) => (
+                                    <Text key={`${index}-goal-${lineIndex}`}>  {line}</Text>
+                                ))}
+                            </React.Fragment>
+                        );
+                    })}
                 </>
             ) : (
                 <Text>No active sprints found</Text>

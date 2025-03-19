@@ -20,7 +20,8 @@ resolver.define('getActiveSprints', async (req) => {
             activeSprints.push(
                 ...sprints.values.map(sprint => ({
                     boardName: board.name,
-                    sprintName: sprint.name
+                    sprintName: sprint.name,
+                    goal: sprint.goal
                 }))
             );
         }
