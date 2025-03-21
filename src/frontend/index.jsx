@@ -1,15 +1,18 @@
-import React, {useEffect, useState, Fragment} from 'react';
-import ForgeReconciler, {Text, Strong, Em} from '@forge/react';
+import React, {useEffect, useState} from 'react';
+import ForgeReconciler, {Text, Strong, Em, Button, Textfield, Label} from '@forge/react';
 import {invoke} from '@forge/bridge';
 
 const App = () => {
     const [sprints, setSprints] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showClosedSprints, setShowClosedSprints] = useState(false);
+    const [showSprintsWithoutGoal, setShowSprintsWithoutGoal] = useState(false);
+    const [searchText, setSearchText] = useState('');
 
     useEffect(() => {
-        invoke('getActiveSprints')
+        setLoading(true);
+        invoke('getActiveSprints', {showClosed: showClosedSprints})
             .then(data => {
-                console.log(data);
                 setSprints(data);
                 setLoading(false);
             })
@@ -17,34 +20,78 @@ const App = () => {
                 console.error('Error:', error);
                 setLoading(false);
             });
-    }, []);
+    }, [showClosedSprints]);
 
-    console.log("Sprints: ", sprints);
+    const toggleClosedSprints = () => {
+        setShowClosedSprints(!showClosedSprints);
+    };
+
+    const toggleSprintsWithoutGoal = () => {
+        setShowSprintsWithoutGoal(!showSprintsWithoutGoal);
+    }
+
+    const handleSearchChange = (e) => {
+        setSearchText(e.target.value);
+    };
+
+    const filteredSprints = sprints.filter(sprint => {
+        // Filter by goal presence
+        if (!showSprintsWithoutGoal && (!sprint.goal || sprint.goal.trim() === '')) {
+            return false;
+        }
+
+        // Filter by sprint name (case insensitive)
+        if (searchText && !sprint.sprintName.toLowerCase().includes(searchText.toLowerCase())) {
+            return false;
+        }
+
+        return true;
+    })
+        // Remove duplicates based on sprintId
+        .reduce((unique, sprint) => {
+            const exists = unique.some(s => s.sprintId === sprint.sprintId);
+            if (!exists) {
+                unique.push(sprint);
+            }
+            return unique;
+        }, []);
 
     return (
         <>
-            <Text>Active Sprints:</Text>
+            <Label labelFor={'searchField'}>Filter by sprint name</Label>
+            <Textfield
+                key={'searchField'}
+                onChange={handleSearchChange}
+                value={searchText}
+            />
+            <Button onClick={toggleClosedSprints}>
+                {`${showClosedSprints ? '✓' : '□'} Show closed sprints`}
+            </Button>
+            <Button onClick={toggleSprintsWithoutGoal}>
+                {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
+            </Button>
+            <Text>Sprints:</Text>
             {loading ? (
                 <Text>Loading...</Text>
-            ) : sprints.length > 0 ? (
+            ) : filteredSprints.length > 0 ? (
                 <>
-                    {sprints.map((sprint, index) => {
+                    {filteredSprints.map((sprint, index) => {
                         const goalText = sprint.goal || 'No goal set';
                         const goalLines = goalText.split('\n');
 
                         return (
                             <React.Fragment key={index}>
-                                <Strong>{sprint.sprintName}</Strong>
-                                <Text><Em>Goal:</Em></Text>
+                                <Text><Strong>{sprint.sprintName}{sprint.state === 'closed' ? ' (closed)' : ''}</Strong></Text>
+                                {/*<Text><Em>Goal:</Em></Text>*/}
                                 {goalLines.map((line, lineIndex) => (
-                                    <Text key={`${index}-goal-${lineIndex}`}>  {line}</Text>
+                                    <Text key={`${index}-goal-${lineIndex}`}>&nbsp;&nbsp;&nbsp;&nbsp;{line}</Text>
                                 ))}
                             </React.Fragment>
                         );
                     })}
                 </>
             ) : (
-                <Text>No active sprints found</Text>
+                <Text><Em>No sprints found</Em></Text>
             )}
         </>
     );
