@@ -4,15 +4,30 @@ import api, {route} from '@forge/api';
 const resolver = new Resolver();
 
 resolver.define('getActiveSprints', async (req) => {
-    const { showClosed, showWithoutGoal } = req.payload || {};
+    const {showClosed, showWithoutGoal} = req.payload || {};
 
     try {
-        const boardsResponse = await api.asApp().requestJira(route`/rest/agile/1.0/board?type=scrum`);
-        const boards = await boardsResponse.json();
+        // Initialize pagination variables
+        let startAt = 0;
+        let allBoards = [];
+        let hasMoreBoards = true;
+
+        // Fetch all boards with pagination
+        while (hasMoreBoards) {
+            const boardsResponse = await api.asApp().requestJira(route`/rest/agile/1.0/board?type=scrum&startAt=${startAt}`);
+            const boardsPage = await boardsResponse.json();
+
+            allBoards = [...allBoards, ...boardsPage.values];
+            startAt += boardsPage.maxResults;
+
+            // Check if we've fetched all boards
+            hasMoreBoards = startAt < boardsPage.total;
+        }
+
         const allSprints = [];
 
-        //const devBoards = boards.values.filter(board => board.name.includes('Mobile') || board.name.includes('IaC') || board.name.includes('Taint'));
-        const devBoards = boards.values
+        const devBoards = allBoards.filter(board => board.name.includes('Mobile') || board.name.includes('IaC') || board.name.includes('Taint'));
+        //const devBoards = allBoards
 
         for (const board of devBoards) {
             // Define sprint states to fetch based on checkbox

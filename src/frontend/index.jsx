@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import ForgeReconciler, {Text, Strong, Em, Button, Textfield, Label} from '@forge/react';
+import ForgeReconciler, {Text, Strong, Em, Button, Textfield, Label, TextArea} from '@forge/react';
 import {invoke} from '@forge/bridge';
 
 const App = () => {
@@ -70,7 +70,7 @@ const App = () => {
             <Button onClick={toggleSprintsWithoutGoal}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
             </Button>
-            <Text>Sprints:</Text>
+            <Text>Sprints ({filteredSprints.length}/{sprints.length}):</Text>
             {loading ? (
                 <Text>Loading...</Text>
             ) : filteredSprints.length > 0 ? (
@@ -83,9 +83,15 @@ const App = () => {
                             <React.Fragment key={index}>
                                 <Text><Strong>{sprint.sprintName}{sprint.state === 'closed' ? ' (closed)' : ''}</Strong></Text>
                                 {/*<Text><Em>Goal:</Em></Text>*/}
-                                {goalLines.map((line, lineIndex) => (
+                                <TextArea
+                                    key={`goal-${index}`}
+                                    value={goalText}
+                                    isReadOnly={true}
+                                    appearance={"none"}
+                                />
+                                {/*goalLines.map((line, lineIndex) => (
                                     <Text key={`${index}-goal-${lineIndex}`}>&nbsp;&nbsp;&nbsp;&nbsp;{line}</Text>
-                                ))}
+                                ))*/}
                             </React.Fragment>
                         );
                     })}
