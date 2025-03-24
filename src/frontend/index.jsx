@@ -70,7 +70,7 @@ const App = () => {
         return () => {
             isActive = false;
         };
-        console.log("3");
+
     }, [showClosedSprints]);
 
     const toggleClosedSprints = () => {
