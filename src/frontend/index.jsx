@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import ForgeReconciler, {Text, Strong, Em, Button, Textfield, Label, TextArea} from '@forge/react';
+import ForgeReconciler, {Button, Em, Label, Strong, Text, TextArea, Textfield} from '@forge/react';
 import {invoke} from '@forge/bridge';
 
 const App = () => {
@@ -8,18 +8,69 @@ const App = () => {
     const [showClosedSprints, setShowClosedSprints] = useState(false);
     const [showSprintsWithoutGoal, setShowSprintsWithoutGoal] = useState(false);
     const [searchText, setSearchText] = useState('');
+    const [loadedPercent, setLoadedPercent] = useState(0);
 
     useEffect(() => {
-        setLoading(true);
-        invoke('getActiveSprints', {showClosed: showClosedSprints})
-            .then(data => {
-                setSprints(data);
-                setLoading(false);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                setLoading(false);
-            });
+        let isActive = true;
+
+        const fetchData = async () => {
+
+            setLoading(true);
+            setSprints([]); // Clear existing sprints
+            setLoadedPercent(0);
+
+            try {
+                // First, get all boards
+                const allBoards = await invoke('getAllBoards');
+
+                // Check if this request was superseded
+                if (!isActive) return;
+
+                let accumulatedSprints = [];
+
+                // Process each board sequentially
+                let index = 0;
+                for (const board of allBoards) {
+                    // Check if this request was superseded
+                    if (!isActive) return;
+
+                    // Get sprints for this board
+                    const boardSprints = await invoke('getSprintsForBoard', {
+                        boardId: board.id,
+                        boardName: board.name,
+                        showClosed: showClosedSprints
+                    });
+
+                    // Check if this request was superseded
+                    if (!isActive) return;
+
+                    // Add new sprints to accumulated collection
+                    accumulatedSprints = [...accumulatedSprints, ...boardSprints];
+
+                    // Update UI after each board's sprints are processed
+                    setSprints([...accumulatedSprints]);
+
+                    // Update loading progress
+                    setLoadedPercent(Math.round((100 * ++index) / allBoards.length));
+                }
+
+                if (isActive) {
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                if (isActive) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchData();
+
+        return () => {
+            isActive = false;
+        };
+        console.log("3");
     }, [showClosedSprints]);
 
     const toggleClosedSprints = () => {
@@ -34,7 +85,17 @@ const App = () => {
         setSearchText(e.target.value);
     };
 
-    const filteredSprints = sprints.filter(sprint => {
+    // Remove duplicates based on sprintId
+    const uniqueSprints = sprints
+        .reduce((unique, sprint) => {
+            const exists = unique.some(s => s.sprintId === sprint.sprintId);
+            if (!exists) {
+                unique.push(sprint);
+            }
+            return unique;
+        }, []);
+
+    const filteredSprints = uniqueSprints.filter(sprint => {
         // Filter by goal presence
         if (!showSprintsWithoutGoal && (!sprint.goal || sprint.goal.trim() === '')) {
             return false;
@@ -46,15 +107,8 @@ const App = () => {
         }
 
         return true;
-    })
-        // Remove duplicates based on sprintId
-        .reduce((unique, sprint) => {
-            const exists = unique.some(s => s.sprintId === sprint.sprintId);
-            if (!exists) {
-                unique.push(sprint);
-            }
-            return unique;
-        }, []);
+    });
+
 
     return (
         <>
@@ -70,10 +124,10 @@ const App = () => {
             <Button onClick={toggleSprintsWithoutGoal}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
             </Button>
-            <Text>Sprints ({filteredSprints.length}/{sprints.length}):</Text>
-            {loading ? (
-                <Text>Loading...</Text>
-            ) : filteredSprints.length > 0 ? (
+            <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
+                (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>
+
+            {filteredSprints.length > 0 ? (
                 <>
                     {filteredSprints.map((sprint, index) => {
                         const goalText = sprint.goal || 'No goal set';
@@ -96,9 +150,7 @@ const App = () => {
                         );
                     })}
                 </>
-            ) : (
-                <Text><Em>No sprints found</Em></Text>
-            )}
+            ) : (loading ? <></> : <Text><Em>No sprints found</Em></Text>)}
         </>
     );
 };
