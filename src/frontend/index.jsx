@@ -13,45 +13,35 @@ const App = () => {
     useEffect(() => {
         let isActive = true;
 
-        const fetchData = async () => {
-
+        const fetchData = async (useAllBoards = false) => {
             setLoading(true);
-            setSprints([]); // Clear existing sprints
+            setSprints([]);
             setLoadedPercent(0);
 
             try {
-                // First, get all boards
-                const allBoards = await invoke('getAllBoards');
+                // Get boards based on parameter
+                const boardsToProcess = useAllBoards
+                    ? await invoke('getAllBoards')
+                    : await invoke('getBoardsWithSprints');
 
-                // Check if this request was superseded
                 if (!isActive) return;
 
                 let accumulatedSprints = [];
-
-                // Process each board sequentially
                 let index = 0;
-                for (const board of allBoards) {
-                    // Check if this request was superseded
+                for (const board of boardsToProcess) {
                     if (!isActive) return;
 
-                    // Get sprints for this board
                     const boardSprints = await invoke('getSprintsForBoard', {
                         boardId: board.id,
                         boardName: board.name,
                         showClosed: showClosedSprints
                     });
 
-                    // Check if this request was superseded
                     if (!isActive) return;
 
-                    // Add new sprints to accumulated collection
                     accumulatedSprints = [...accumulatedSprints, ...boardSprints];
-
-                    // Update UI after each board's sprints are processed
                     setSprints([...accumulatedSprints]);
-
-                    // Update loading progress
-                    setLoadedPercent(Math.round((100 * ++index) / allBoards.length));
+                    setLoadedPercent(Math.round((100 * ++index) / boardsToProcess.length));
                 }
 
                 if (isActive) {
@@ -65,13 +55,42 @@ const App = () => {
             }
         };
 
-        fetchData();
+        // Initial load with just boards with sprints
+        fetchData(false);
 
         return () => {
             isActive = false;
         };
-
     }, [showClosedSprints]);
+
+    const loadAllBoards = async () => {
+        setLoading(true);
+        setSprints([]);
+        setLoadedPercent(0);
+
+        try {
+            const allBoards = await invoke('getAllBoards');
+
+            let accumulatedSprints = [];
+            let index = 0;
+            for (const board of allBoards) {
+                const boardSprints = await invoke('getSprintsForBoard', {
+                    boardId: board.id,
+                    boardName: board.name,
+                    showClosed: showClosedSprints
+                });
+
+                accumulatedSprints = [...accumulatedSprints, ...boardSprints];
+                setSprints([...accumulatedSprints]);
+                setLoadedPercent(Math.round((100 * ++index) / allBoards.length));
+            }
+
+            setLoading(false);
+        } catch (error) {
+            console.error('Error loading all boards:', error);
+            setLoading(false);
+        }
+    };
 
     const toggleClosedSprints = () => {
         setShowClosedSprints(!showClosedSprints);
@@ -79,7 +98,7 @@ const App = () => {
 
     const toggleSprintsWithoutGoal = () => {
         setShowSprintsWithoutGoal(!showSprintsWithoutGoal);
-    }
+    };
 
     const handleSearchChange = (e) => {
         setSearchText(e.target.value);
@@ -109,7 +128,6 @@ const App = () => {
         return true;
     });
 
-
     return (
         <>
             <Label labelFor={'searchField'}>Filter by sprint name</Label>
@@ -124,6 +142,9 @@ const App = () => {
             <Button onClick={toggleSprintsWithoutGoal}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
             </Button>
+            <Button onClick={loadAllBoards} isDisabled={loading}>
+                Query All Boards
+            </Button>
             <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
                 (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>
 
@@ -131,21 +152,16 @@ const App = () => {
                 <>
                     {filteredSprints.map((sprint, index) => {
                         const goalText = sprint.goal || 'No goal set';
-                        const goalLines = goalText.split('\n');
 
                         return (
                             <React.Fragment key={index}>
                                 <Text><Strong>{sprint.sprintName}{sprint.state === 'closed' ? ' (closed)' : ''}</Strong></Text>
-                                {/*<Text><Em>Goal:</Em></Text>*/}
                                 <TextArea
                                     key={`goal-${index}`}
                                     value={goalText}
                                     isReadOnly={true}
                                     appearance={"none"}
                                 />
-                                {/*goalLines.map((line, lineIndex) => (
-                                    <Text key={`${index}-goal-${lineIndex}`}>&nbsp;&nbsp;&nbsp;&nbsp;{line}</Text>
-                                ))*/}
                             </React.Fragment>
                         );
                     })}
