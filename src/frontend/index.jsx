@@ -10,6 +10,7 @@ const App = () => {
     const [searchText, setSearchText] = useState('');
     const [loadedPercent, setLoadedPercent] = useState(0);
     const [loadAllBoardsNext, setLoadAllBoardsNext] = useState(false);
+    const [triggerCounter, setTriggerCounter] = useState(0);
 
     useEffect(() => {
         let isActive = true;
@@ -24,27 +25,54 @@ const App = () => {
             try {
                 // Get boards based on parameter
                 const boardsToProcess = useAllBoards
-                    ? await invoke('getAllBoards', {showClosed: showClosedSprints})
+                    ? await invoke('getAllBoards')
                     : await invoke('getBoardsWithSprints', {showClosed: showClosedSprints});
 
                 if (!isActive) return;
 
                 let accumulatedSprints = [];
                 let index = 0;
+
+                // If we're querying all boards, track which boards have sprints
+                const boardsWithActiveSprints = new Set();
+                const boardsWithAnySprints = new Set();
+
                 for (const board of boardsToProcess) {
                     if (!isActive) return;
 
                     const boardSprints = await invoke('getSprintsForBoard', {
                         boardId: board.id,
                         boardName: board.name,
-                        showClosed: showClosedSprints
+                        showClosed: useAllBoards ? true : showClosedSprints
                     });
 
                     if (!isActive) return;
 
-                    accumulatedSprints = [...accumulatedSprints, ...boardSprints];
+                    // If we're querying all boards, update our sets
+                    if (useAllBoards && boardSprints.length > 0) {
+                        boardsWithAnySprints.add(board.id);
+
+                        if (boardSprints.some(sprint => sprint.state === 'active')) {
+                            boardsWithActiveSprints.add(board.id);
+                        }
+                    }
+
+                    // When querying all boards, filter the sprints based on current setting
+                    const sprintsToAdd = useAllBoards && !showClosedSprints
+                        ? boardSprints.filter(sprint => sprint.state === 'active')
+                        : boardSprints;
+
+                    accumulatedSprints = [...accumulatedSprints, ...sprintsToAdd];
                     setSprints([...accumulatedSprints]);
                     setLoadedPercent(Math.round((100 * ++index) / boardsToProcess.length));
+                }
+
+                // If we queried all boards, update the lists in storage
+                if (useAllBoards) {
+                    await invoke('updateBoardLists', {
+                        boardsWithActiveSprints: Array.from(boardsWithActiveSprints),
+                        boardsWithAnySprints: Array.from(boardsWithAnySprints)
+                    });
                 }
 
                 if (isActive) {
@@ -58,13 +86,12 @@ const App = () => {
             }
         };
 
-        // Initial load with just boards with sprints
-        fetchData(false);
+        fetchData();
 
         return () => {
             isActive = false;
         };
-    }, [showClosedSprints, loadAllBoardsNext]);
+    }, [showClosedSprints, triggerCounter]);
 
     const toggleClosedSprints = () => {
         setShowClosedSprints(!showClosedSprints);
@@ -76,6 +103,11 @@ const App = () => {
 
     const handleSearchChange = (e) => {
         setSearchText(e.target.value);
+    };
+
+    const loadAllBoards = () => {
+        setLoadAllBoardsNext(true);
+        setTriggerCounter(triggerCounter + 1);
     };
 
     // Remove duplicates based on sprintId
@@ -102,10 +134,6 @@ const App = () => {
         return true;
     });
 
-    const loadAllBoards = () => {
-        setLoadAllBoardsNext(true);
-    }
-
     return (
         <>
             <Label labelFor={'searchField'}>Filter by sprint name</Label>
@@ -115,13 +143,13 @@ const App = () => {
                 value={searchText}
             />
             <Button onClick={toggleClosedSprints}>
-                {`${showClosedSprints ? '✓' : '□'} Show closed sprints`}
+                {`${showClosedSprints ? '✓' : '□'} Show closed sprints (triggers reload)`}
             </Button>
             <Button onClick={toggleSprintsWithoutGoal}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
             </Button>
             <Button onClick={loadAllBoards} isDisabled={loading}>
-                Query All Boards
+                Re-query all boards
             </Button>
             <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
                 (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>

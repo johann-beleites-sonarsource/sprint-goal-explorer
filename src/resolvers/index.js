@@ -61,13 +61,6 @@ resolver.define('getSprintsForBoard', async (req) => {
             hasMoreSprints = startAt < sprintsPage.total;
         }
 
-        // Count active and any sprints
-        const activeSprints = allSprints.filter(sprint => sprint.state === 'active');
-
-        // Store both states
-        await storage.set(`board_has_active_sprints_${boardId}`, activeSprints.length > 0);
-        await storage.set(`board_has_any_sprints_${boardId}`, allSprints.length > 0);
-
         return allSprints;
     } catch (error) {
         console.error(`Error fetching sprints for board ${boardId}:`, error);
@@ -75,35 +68,39 @@ resolver.define('getSprintsForBoard', async (req) => {
     }
 });
 
+// Get boards with sprints based on stored lists
 resolver.define('getBoardsWithSprints', async (req) => {
     const {showClosed = false} = req.payload || {};
 
     try {
-        const allBoards = await getAllBoardsImpl();
-        const filteredBoards = [];
+        // Get the list based on whether we want to show closed sprints
+        const listKey = showClosed ? 'boards_with_any_sprints' : 'boards_with_active_sprints';
+        const boardIdList = await storage.get(listKey) || [];
 
-        for (const board of allBoards) {
-            // Check the appropriate storage key based on whether we want to show closed sprints
-            const storageKey = showClosed
-                ? `board_has_any_sprints_${board.id}`
-                : `board_has_active_sprints_${board.id}`;
-
-            const hasSprints = await storage.get(storageKey);
-
-            console.log("Board:", board.id, ":", hasSprints);
-
-            // Include boards that have the right type of sprints or where it's unknown
-            if (hasSprints !== false) {
-                filteredBoards.push(board);
-            }
+        if (boardIdList.length === 0) {
+            return [];
         }
 
-        console.log("filtered boards:", filteredBoards);
-
-        return filteredBoards;
+        // Get all boards and filter by IDs in our list
+        const allBoards = await getAllBoardsImpl();
+        return allBoards.filter(board => boardIdList.includes(board.id));
     } catch (error) {
         console.error('Error fetching boards with sprints:', error);
         return [];
+    }
+});
+
+// Update the global lists of boards with sprints
+resolver.define('updateBoardLists', async (req) => {
+    const {boardsWithActiveSprints, boardsWithAnySprints} = req.payload;
+
+    try {
+        await storage.set('boards_with_active_sprints', boardsWithActiveSprints);
+        await storage.set('boards_with_any_sprints', boardsWithAnySprints);
+        return {success: true};
+    } catch (error) {
+        console.error('Error updating board lists:', error);
+        return {success: false, error: error.message};
     }
 });
 
