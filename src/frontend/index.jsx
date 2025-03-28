@@ -9,11 +9,14 @@ const App = () => {
     const [showSprintsWithoutGoal, setShowSprintsWithoutGoal] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [loadedPercent, setLoadedPercent] = useState(0);
+    const [loadAllBoardsNext, setLoadAllBoardsNext] = useState(false);
 
     useEffect(() => {
         let isActive = true;
+        const useAllBoards = loadAllBoardsNext;
+        setLoadAllBoardsNext(false);
 
-        const fetchData = async (useAllBoards = false) => {
+        const fetchData = async () => {
             setLoading(true);
             setSprints([]);
             setLoadedPercent(0);
@@ -21,8 +24,8 @@ const App = () => {
             try {
                 // Get boards based on parameter
                 const boardsToProcess = useAllBoards
-                    ? await invoke('getAllBoards')
-                    : await invoke('getBoardsWithSprints');
+                    ? await invoke('getAllBoards', {showClosed: showClosedSprints})
+                    : await invoke('getBoardsWithSprints', {showClosed: showClosedSprints});
 
                 if (!isActive) return;
 
@@ -61,36 +64,7 @@ const App = () => {
         return () => {
             isActive = false;
         };
-    }, [showClosedSprints]);
-
-    const loadAllBoards = async () => {
-        setLoading(true);
-        setSprints([]);
-        setLoadedPercent(0);
-
-        try {
-            const allBoards = await invoke('getAllBoards');
-
-            let accumulatedSprints = [];
-            let index = 0;
-            for (const board of allBoards) {
-                const boardSprints = await invoke('getSprintsForBoard', {
-                    boardId: board.id,
-                    boardName: board.name,
-                    showClosed: showClosedSprints
-                });
-
-                accumulatedSprints = [...accumulatedSprints, ...boardSprints];
-                setSprints([...accumulatedSprints]);
-                setLoadedPercent(Math.round((100 * ++index) / allBoards.length));
-            }
-
-            setLoading(false);
-        } catch (error) {
-            console.error('Error loading all boards:', error);
-            setLoading(false);
-        }
-    };
+    }, [showClosedSprints, loadAllBoardsNext]);
 
     const toggleClosedSprints = () => {
         setShowClosedSprints(!showClosedSprints);
@@ -127,6 +101,10 @@ const App = () => {
 
         return true;
     });
+
+    const loadAllBoards = () => {
+        setLoadAllBoardsNext(true);
+    }
 
     return (
         <>
