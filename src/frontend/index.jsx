@@ -11,6 +11,7 @@ const App = () => {
     const [loadedPercent, setLoadedPercent] = useState(0);
     const [loadAllBoardsNext, setLoadAllBoardsNext] = useState(false);
     const [triggerCounter, setTriggerCounter] = useState(0);
+    const [allSprintsAlreadyLoaded, setAllSprintsAlreadyLoaded] = useState(false);
 
     useEffect(() => {
         let isActive = true;
@@ -77,6 +78,9 @@ const App = () => {
 
                 if (isActive) {
                     setLoading(false);
+                    if (showClosedSprints && !allSprintsAlreadyLoaded) {
+                        setAllSprintsAlreadyLoaded(true);
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -91,10 +95,13 @@ const App = () => {
         return () => {
             isActive = false;
         };
-    }, [showClosedSprints, triggerCounter]);
+    }, [triggerCounter]);
 
     const toggleClosedSprints = () => {
         setShowClosedSprints(!showClosedSprints);
+        if (!allSprintsAlreadyLoaded) {
+            setTriggerCounter(triggerCounter + 1);
+        }
     };
 
     const toggleSprintsWithoutGoal = () => {
@@ -126,6 +133,10 @@ const App = () => {
             return false;
         }
 
+        if (!showClosedSprints && sprint.state === 'closed') {
+            return false;
+        }
+
         // Filter by sprint name (case insensitive)
         if (searchText && !sprint.sprintName.toLowerCase().includes(searchText.toLowerCase())) {
             return false;
@@ -143,7 +154,7 @@ const App = () => {
                 value={searchText}
             />
             <Button onClick={toggleClosedSprints}>
-                {`${showClosedSprints ? '✓' : '□'} Show closed sprints (triggers reload)`}
+                {`${showClosedSprints ? '✓' : '□'} Show closed sprints${allSprintsAlreadyLoaded ? '' : ' (triggers reload)'}`}
             </Button>
             <Button onClick={toggleSprintsWithoutGoal}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
