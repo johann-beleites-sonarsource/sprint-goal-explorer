@@ -1,5 +1,15 @@
 import React, {useEffect, useState} from 'react';
-import ForgeReconciler, {Button, Em, Label, Strong, Text, TextArea, Textfield} from '@forge/react';
+import ForgeReconciler, {
+    Button,
+    Em,
+    Label,
+    Strong,
+    Text,
+    TextArea,
+    Textfield,
+    Heading,
+    Stack
+} from '@forge/react';
 import {invoke} from '@forge/bridge';
 
 const App = () => {
@@ -12,6 +22,7 @@ const App = () => {
     const [loadAllBoardsNext, setLoadAllBoardsNext] = useState(false);
     const [triggerCounter, setTriggerCounter] = useState(0);
     const [allSprintsAlreadyLoaded, setAllSprintsAlreadyLoaded] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
 
     useEffect(() => {
         let isActive = true;
@@ -117,6 +128,10 @@ const App = () => {
         setTriggerCounter(triggerCounter + 1);
     };
 
+    const toggleHelp = () => {
+        setShowHelp(!showHelp);
+    };
+
     // Remove duplicates based on sprintId
     const uniqueSprints = sprints
         .reduce((unique, sprint) => {
@@ -145,6 +160,45 @@ const App = () => {
         return true;
     });
 
+    // Help content component
+    const HelpContent = () => (
+        <>
+            <Heading size="large">Sprint Goal Explorer Help</Heading>
+            <Text>
+                <Strong>What is Sprint Goal Explorer?</Strong>
+            </Text>
+            <Text>
+                This application displays sprint goals collected from your entire Jira instance.
+                It helps you view and track goals across different boards and sprints.
+            </Text>
+            <Text>
+                <Strong>How to use:</Strong>
+            </Text>
+            <Text>
+                <Em>• Filter by sprint name</Em> - Type in the text field to filter sprints
+            </Text>
+            <Text>
+                <Em>• Show closed sprints</Em> - Toggle to display already closed sprints
+            </Text>
+            <Text>
+                <Em>• Show sprints without goal</Em> - Toggle to include sprints that don't have a goal set
+            </Text>
+            <Text>
+                <Em>• Re-query all boards</Em> - To improve loading times, the app will remember which boards
+                contain at least one sprint. Click to re-check all boards in your Jira instance, even if they
+                previously did not contain any sprints. This may be necessary when your board is new or you can't
+                see your sprints here. This may take some time for large instances.
+            </Text>
+            <Text>
+                <Strong>Contact Information:</Strong>
+            </Text>
+            <Text>
+                For issues, questions or feedback, please reach out at johann.beleites@sonarsource.com.
+            </Text>
+            <Button appearance="primary" onClick={toggleHelp}>Back to Results</Button>
+        </>
+    );
+
     return (
         <>
             <Label labelFor={'searchField'}>Filter by sprint name</Label>
@@ -152,38 +206,48 @@ const App = () => {
                 key={'searchField'}
                 onChange={handleSearchChange}
                 value={searchText}
+                isDisabled={showHelp}
             />
-            <Button onClick={toggleClosedSprints}>
+            <Button onClick={toggleClosedSprints} isDisabled={showHelp}>
                 {`${showClosedSprints ? '✓' : '□'} Show closed sprints${allSprintsAlreadyLoaded ? '' : ' (triggers reload)'}`}
             </Button>
-            <Button onClick={toggleSprintsWithoutGoal}>
+            <Button onClick={toggleSprintsWithoutGoal} isDisabled={showHelp}>
                 {`${showSprintsWithoutGoal ? '✓' : '□'} Show sprints without goal`}
             </Button>
-            <Button onClick={loadAllBoards} isDisabled={loading}>
+            <Button onClick={loadAllBoards} isDisabled={loading || showHelp}>
                 Re-query all boards
             </Button>
-            <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
-                (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>
+            <Button appearance="subtle" onClick={toggleHelp} iconBefore={<span>❓</span>}>Help</Button>
 
-            {filteredSprints.length > 0 ? (
+            {/* Conditionally show either help or sprint results */}
+            {showHelp ? (
+                <HelpContent/>
+            ) : (
                 <>
-                    {filteredSprints.map((sprint, index) => {
-                        const goalText = sprint.goal || 'No goal set';
+                    <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
+                        (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>
 
-                        return (
-                            <React.Fragment key={index}>
-                                <Text><Strong>{sprint.sprintName}{sprint.state === 'closed' ? ' (closed)' : ''}</Strong></Text>
-                                <TextArea
-                                    key={`goal-${index}`}
-                                    value={goalText}
-                                    isReadOnly={true}
-                                    appearance={"none"}
-                                />
-                            </React.Fragment>
-                        );
-                    })}
+                    {filteredSprints.length > 0 ? (
+                        <>
+                            {filteredSprints.map((sprint, index) => {
+                                const goalText = sprint.goal || 'No goal set';
+
+                                return (
+                                    <React.Fragment key={index}>
+                                        <Text><Strong>{sprint.sprintName}{sprint.state === 'closed' ? ' (closed)' : ''}</Strong></Text>
+                                        <TextArea
+                                            key={`goal-${index}`}
+                                            value={goalText}
+                                            isReadOnly={true}
+                                            appearance={"none"}
+                                        />
+                                    </React.Fragment>
+                                );
+                            })}
+                        </>
+                    ) : (loading ? <></> : <Text><Em>No sprints found</Em></Text>)}
                 </>
-            ) : (loading ? <></> : <Text><Em>No sprints found</Em></Text>)}
+            )}
         </>
     );
 };
