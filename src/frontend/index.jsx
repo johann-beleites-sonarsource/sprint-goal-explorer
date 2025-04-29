@@ -224,8 +224,9 @@ const App = () => {
                 <HelpContent/>
             ) : (
                 <>
-                    <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints
-                        (showing {filteredSprints.length} of {uniqueSprints.length} loaded):</Text>
+                    <Text>{loading ? <>Loading {loadedPercent}%... </> : <></>} Sprints (
+                        {showSprintsWithoutGoal ? uniqueSprints.length + ' sprints' :
+                            'hiding ' + (uniqueSprints.length - filteredSprints.length) + ' of ' + uniqueSprints.length + ' sprints as their goal is empty'}):</Text>
 
                     {filteredSprints.length > 0 ? (
                         <>
